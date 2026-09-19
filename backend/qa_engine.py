@@ -6,6 +6,7 @@ import time
 import numpy as np
 import torch
 from sentence_transformers import SentenceTransformer
+from huggingface_hub import snapshot_download
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
 
 from models.rnn_ranker import GRURanker, Vocabulary
@@ -20,9 +21,11 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 
 INDEX_PATH = DATA_DIR / "index.pkl"
-RNN_MODEL_PATH = DATA_DIR / "rnn_model.pt"
+# Models are stored in a public Hugging Face repository for Streamlit Cloud.
+HF_MODEL_REPO = "Jeswina-123/AI_QA_Complete_Project_Models"
 
-# Fine-tuned SentenceTransformer model
+# Local paths retained for the retrieval index.
+RNN_MODEL_PATH = DATA_DIR / "rnn_model.pt"
 MINILM_MODEL_PATH = DATA_DIR / "minilm_finetuned"
 
 
@@ -94,6 +97,26 @@ class QAEngine:
         print(f"Device: {DEVICE}")
 
         # ----------------------------------------------------
+        # DOWNLOAD / LOAD CLOUD MODELS
+        # ----------------------------------------------------
+        # The model repository is public, so no Hugging Face token
+        # is required. snapshot_download caches the files locally,
+        # which avoids downloading them again on every query.
+        print("\nLoading models from Hugging Face...")
+
+        self.hf_model_dir = Path(
+            snapshot_download(
+                repo_id=HF_MODEL_REPO,
+                repo_type="model"
+            )
+        )
+
+        self.cloud_rnn_model_path = self.hf_model_dir / "rnn_model.pt"
+        self.cloud_minilm_model_path = self.hf_model_dir / "minilm_finetuned"
+
+        print(f"Model directory: {self.hf_model_dir}")
+
+        # ----------------------------------------------------
         # LOAD RETRIEVAL INDEX
         # ----------------------------------------------------
 
@@ -148,14 +171,14 @@ class QAEngine:
 
         print("\nLoading fine-tuned All-MiniLM-L6-v2...")
 
-        if not MINILM_MODEL_PATH.exists():
+        if not self.cloud_minilm_model_path.exists():
             raise FileNotFoundError(
-                "Fine-tuned MiniLM model was not found at:\n"
-                f"{MINILM_MODEL_PATH}"
+                "Fine-tuned MiniLM model was not downloaded from Hugging Face:\n"
+                f"{self.cloud_minilm_model_path}"
             )
 
         self.mini = SentenceTransformer(
-            EMBEDDING_MODEL_NAME,
+            str(self.cloud_minilm_model_path),
             device=DEVICE
         )
 
@@ -163,7 +186,7 @@ class QAEngine:
 
         print(
             "Embedding dimension:",
-            self.mini.get_sentence_embedding_dimension()
+            self.mini.get_embedding_dimension()
         )
 
         # ----------------------------------------------------
@@ -183,7 +206,7 @@ class QAEngine:
             )
 
             expected_dimension = (
-                self.mini.get_sentence_embedding_dimension()
+                self.mini.get_embedding_dimension()
             )
 
             if (
@@ -233,13 +256,14 @@ class QAEngine:
 
     def _load_rnn(self):
 
-        if not RNN_MODEL_PATH.exists():
+        if not self.cloud_rnn_model_path.exists():
             raise FileNotFoundError(
-                f"RNN model not found:\n{RNN_MODEL_PATH}"
+                "RNN model was not downloaded from Hugging Face:\n"
+                f"{self.cloud_rnn_model_path}"
             )
 
         checkpoint = torch.load(
-            RNN_MODEL_PATH,
+            self.cloud_rnn_model_path,
             map_location=DEVICE
         )
 
@@ -333,7 +357,7 @@ class QAEngine:
             and self.embeddings.ndim == 2
             and self.embeddings.shape[0] == len(self.contexts)
             and self.embeddings.shape[1]
-            == self.mini.get_sentence_embedding_dimension()
+            == self.mini.get_embedding_dimension()
         ):
 
             query_embedding = self.mini.encode(
