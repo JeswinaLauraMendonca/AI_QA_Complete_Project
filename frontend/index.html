@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Question Answering System</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f4f7fb;color:#1f2937}
+.container{max-width:1000px;margin:45px auto;padding:20px}
+.card{background:#fff;border-radius:18px;padding:28px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+h1{margin:0 0 8px;font-size:30px}
+.subtitle{color:#6b7280;margin-bottom:24px}
+textarea{width:100%;min-height:110px;resize:vertical;padding:14px;border:1px solid #d1d5db;border-radius:10px;font-size:16px}
+.controls{display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap}
+select,button{padding:11px 15px;border-radius:9px;border:1px solid #cbd5e1;font-size:15px}
+button{cursor:pointer;background:#111827;color:white;border-color:#111827}
+button:disabled{opacity:.6;cursor:wait}
+.answer{margin-top:25px;padding:20px;border-radius:12px;background:#f8fafc}
+.answer h2{margin-top:0}
+.context{margin-top:15px;padding:16px;background:#eef2f7;border-radius:10px;line-height:1.6}
+.meta{font-size:13px;color:#64748b;margin-top:8px}
+.error{margin-top:20px;padding:14px;background:#fee2e2;border-radius:10px;color:#991b1b}
+.loading{margin-top:20px;color:#475569}
+@media(max-width:600px){.container{margin:10px auto}.card{padding:18px}h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="card">
+<h1>AI-Based Question Answering System</h1>
+<div class="subtitle">BM25 • All-MiniLM-L6-v2 • RNN • Hybrid</div>
+
+<textarea id="question" placeholder="Example: What is the capital of France?"></textarea>
+
+<div class="controls">
+<label for="method"><b>Approach:</b></label>
+<select id="method">
+<option value="hybrid">Hybrid</option>
+<option value="bm25">BM25</option>
+<option value="minilm">All-MiniLM-L6-v2</option>
+<option value="rnn">RNN (GRU)</option>
+</select>
+<button id="askButton" onclick="askQuestion()">Ask Question</button>
+</div>
+
+<div id="result"></div>
+</div>
+</div>
+
+<script>
+function escapeHTML(value){
+    return String(value).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+    }[c]));
+}
+
+async function askQuestion(){
+    const question=document.getElementById("question").value.trim();
+    const method=document.getElementById("method").value;
+    const result=document.getElementById("result");
+    const button=document.getElementById("askButton");
+
+    if(!question){
+        result.innerHTML='<div class="error">Please enter a question.</div>';
+        return;
+    }
+
+    button.disabled=true;
+    result.innerHTML='<div class="loading">Searching the dataset and ranking relevant contexts...</div>';
+
+    try{
+        const response=await fetch("/api/ask",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({question,method})
+        });
+        const data=await response.json();
+
+        if(!response.ok){
+            throw new Error(data.details || data.error || "Request failed");
+        }
+
+        result.innerHTML=`
+        <div class="answer">
+            <h2>Answer</h2>
+            <p>${escapeHTML(data.best.answer)}</p>
+            <div class="meta">Approach: ${escapeHTML(data.method)} | Score: ${escapeHTML(data.best.score)}</div>
+            <div class="context"><b>Retrieved context</b><br>${escapeHTML(data.best.context)}</div>
+        </div>`;
+    }catch(error){
+        result.innerHTML='<div class="error"><b>Error:</b> '+escapeHTML(error.message)+'</div>';
+    }finally{
+        button.disabled=false;
+    }
+}
+
+document.getElementById("question").addEventListener("keydown", event => {
+    if(event.key==="Enter" && (event.ctrlKey || event.metaKey)){
+        askQuestion();
+    }
+});
+</script>
+</body>
+</html>

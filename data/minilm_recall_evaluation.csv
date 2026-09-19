@@ -1,0 +1,2 @@
+model,correct,total,recall,average_latency
+MiniLM,1679,2000,0.839500,0.000192

@@ -1,0 +1,2 @@
+model,correct,total,recall,average_latency
+RNN_GRU,1,2000,0.000500,7.240044

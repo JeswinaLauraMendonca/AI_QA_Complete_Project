@@ -1,0 +1,2 @@
+model,k1,b,EM,F1,Recall@1,Recall@5,Recall@10,Latency
+BM25,0.8,0.0,0.1,0.1,0.0,0.0,0.0,0.078432

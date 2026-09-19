@@ -1,0 +1,13 @@
+participant_id,method,rating_1_to_10
+1,bm25,
+1,minilm,
+1,rnn,
+1,hybrid,
+2,bm25,
+2,minilm,
+2,rnn,
+2,hybrid,
+3,bm25,
+3,minilm,
+3,rnn,
+3,hybrid,
